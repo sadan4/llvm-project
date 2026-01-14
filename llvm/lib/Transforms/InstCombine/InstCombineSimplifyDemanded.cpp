@@ -2964,6 +2964,17 @@ Value *InstCombinerImpl::SimplifyMultipleUseDemandedFPClass(
     const CallInst *CI = cast<CallInst>(I);
     const Intrinsic::ID IID = CI->getIntrinsicID();
     switch (IID) {
+    case Intrinsic::fabs: {
+      Value *Src = CI->getArgOperand(0);
+      KnownFPClass KnownSrc =
+          computeKnownFPClass(Src, fcAllFlags, CxtI, Depth + 1);
+
+      if (KnownSrc.SignBit == false || ((DemandedMask & fcNan) == fcNone &&
+                                        KnownSrc.isKnownNever(fcNegative)))
+        return Src;
+      Known = KnownFPClass::fabs(KnownSrc);
+      break;
+    }
     case Intrinsic::maximum:
     case Intrinsic::minimum:
     case Intrinsic::maximumnum:
