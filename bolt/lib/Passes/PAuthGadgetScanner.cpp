@@ -1617,19 +1617,24 @@ void FunctionAnalysisContext::findUnsafeUses(
       return;
     }
 
-    if (auto Report = shouldReportReturnGadget(BC, Inst, S))
-      Reports.push_back(*Report);
+    using GSK = opts::GadgetScannerKind;
 
-    if (PacRetGadgetsOnly)
-      return;
-
-    if (auto Report = shouldReportUnsafeTailCall(BC, BF, Inst, S))
-      Reports.push_back(*Report);
-
-    if (auto Report = shouldReportCallGadget(BC, Inst, S))
-      Reports.push_back(*Report);
-    if (auto Report = shouldReportSigningOracle(BC, Inst, S))
-      Reports.push_back(*Report);
+    if (EnabledDetectorsMask & GSK::GS_PAUTH_RETURN_TARGETS) {
+      if (auto Report = shouldReportReturnGadget(BC, Inst, S))
+        Reports.push_back(*Report);
+    }
+    if (EnabledDetectorsMask & GSK::GS_PAUTH_TAIL_CALLS) {
+      if (auto Report = shouldReportUnsafeTailCall(BC, BF, Inst, S))
+        Reports.push_back(*Report);
+    }
+    if (EnabledDetectorsMask & GSK::GS_PAUTH_BRANCH_AND_CALL_TARGETS) {
+      if (auto Report = shouldReportCallGadget(BC, Inst, S))
+        Reports.push_back(*Report);
+    }
+    if (EnabledDetectorsMask & GSK::GS_PAUTH_SIGN_ORACLES) {
+      if (auto Report = shouldReportSigningOracle(BC, Inst, S))
+        Reports.push_back(*Report);
+    }
   });
 }
 
@@ -1660,7 +1665,9 @@ void FunctionAnalysisContext::augmentUnsafeUseReports(
 
 void FunctionAnalysisContext::findUnsafeDefs(
     SmallVector<PartialReport<MCPhysReg>> &Reports) {
-  if (PacRetGadgetsOnly)
+  using GSK = opts::GadgetScannerKind;
+
+  if (!(EnabledDetectorsMask & GSK::GS_PAUTH_AUTH_ORACLES))
     return;
   if (AuthTrapsOnFailure)
     return;
@@ -1741,7 +1748,7 @@ void FunctionAnalysisContext::run() {
 
 void Analysis::runOnFunction(BinaryFunction &BF,
                              MCPlusBuilder::AllocatorIdTy AllocatorId) {
-  FunctionAnalysisContext FA(BF, AllocatorId, PacRetGadgetsOnly);
+  FunctionAnalysisContext FA(BF, AllocatorId, EnabledDetectorsMask);
   FA.run();
 
   const FunctionAnalysisResult &FAR = FA.getResult();
